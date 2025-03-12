@@ -1,35 +1,109 @@
-| Supported Targets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C6 | ESP32-H2 | ESP32-P4 | ESP32-S2 | ESP32-S3 |
-| ----------------- | ----- | -------- | -------- | -------- | -------- | -------- | -------- | -------- |
+# Bluepad32 for ESP32
 
-# _Sample project_
+Supports the different ESP32 chips:
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+* ESP32
+* ESP32-S3
+* ESP32-C3 / ESP32-C6
+* ESP32-H2
 
-This is the simplest buildable example. The example is used by command `idf.py create-project`
-that copies the project to user specified path and set it's name. For more information follow the [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project)
+## Install dependencies
 
+1. Install ESP-IDF
 
+   Install the ESP32 toolchain. Use version **5.3**. Might work on newer / older
+   ones, but not tested.
 
-## How to use example
-We encourage the users to use the example as a template for the new projects.
-A recommended way is to follow the instructions on a [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project).
+    * <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/>
 
-## Example folder contents
+2. Compile Bluepad32
 
-The project **sample_project** contains one source file in C language [main.c](main/main.c). The file is located in folder [main](main).
+    ```sh
+    # Possible options: esp32, esp32-s3, esp32-c3, esp32-c6 or esp32-h2
+    idf.py set-target esp32
+    ```
 
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt`
-files that provide set of directives and instructions describing the project's source files and targets
-(executable, library, or both). 
+   And compile it:
 
-Below is short explanation of remaining files in the project folder.
+    ```sh
+    idf.py build
+    ```
 
+3. Flash it
+
+    ```sh
+    idf.py flash monitor
+    ```
+
+## Debugging
+
+In case you need to debug an ESP32-S3 (or ESP32-C3 / C6) using JTAG, follow these steps: (or
+read [ESP32 JTAG Debugging][esp32-gdb]).
+
+*Note: If you have a standard ESP32, you can do it with an [ESP-PROG][esp-prog] module.*
+
+TL;DR: Open 3 terminals, and do:
+
+### Terminal 1
+
+```shell
+idf.py openocd
 ```
-├── CMakeLists.txt
-├── main
-│   ├── CMakeLists.txt
-│   └── main.c
-└── README.md                  This is the file you are currently reading
+
+Or if you prefer the verbose way (but not both):
+
+```shell
+# Open OpenOCD
+# Valid for ESP32-S3. Change it to "esp32c3-builtin.cfg" for ESP32-C3
+sudo openocd -f board/esp32s3-builtin.cfg  -c "adapter speed 5000"
 ```
-Additionally, the sample project contains Makefile and component.mk files, used for the legacy Make based build system. 
-They are not used or needed when building with CMake and idf.py.
+
+### Terminal 2
+
+```shell
+idf.py gdb
+```
+
+Or if you prefer the verbose way (but not both):
+
+```shell
+xtensa-esp32s3-elf-gdb bluepad32_esp32_example_app.elf
+> target remote :3333
+> set remote hardware-watchpoint-limit 2
+> mon reset halt
+> maintenance flush register-cache
+> thb app_main
+> c
+```
+
+### Terminal 3
+
+```shell
+# macOS
+tio /dev/tty.usbmodem21202
+
+# Linux
+tio /dev/ttyACM0
+```
+
+[esp32-gdb]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/jtag-debugging/index.html
+
+[esp-prog]: https://docs.espressif.com/projects/esp-iot-solution/en/latest/hw-reference/ESP-Prog_guide.html
+
+![](https://asciinema.org/a/650459.svg)
+
+## Supported controllers
+
+![Supported gamepads](https://lh3.googleusercontent.com/pw/AMWts8BB7wT51jpn3HxWHuZLiEM2lX05gmTDsnldHszkXuYqxbowNvtxPtpbHh3CNjv1OBzeyadZjNLNBgE4w2tl2WmP8M9gGBCfWhzmZGQnHBlERSoy5W2dj6-EYmT84yteKTFjp4Jz2H3DgByFiKXaxfFC2g=-no)
+
+
+## License
+
+- Example code: licensed under Public Domain.
+- Bluepad32: licensed under Apache 2.
+- BTstack:
+    - Free to use for open source projects.
+    - Paid for commercial projects.
+    - <https://github.com/bluekitchen/btstack/blob/master/LICENSE>
+
+
