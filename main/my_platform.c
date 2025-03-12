@@ -5,6 +5,8 @@
 
 #include <uni.h>
 
+static const char* TAG = "my_platform";
+
 // Custom "instance"
 typedef struct my_platform_instance_s {
     uni_gamepad_seat_t gamepad_seat;  // which "seat" is being used
@@ -21,7 +23,9 @@ static void my_platform_init(int argc, const char** argv) {
     ARG_UNUSED(argc);
     ARG_UNUSED(argv);
 
-    logi("custom: init()\n");
+    ESP_LOGI(TAG, "平台初始化");
+
+    // logi("custom: init()\n");
 
 #if 0
     uni_gamepad_mappings_t mappings = GAMEPAD_DEFAULT_MAPPINGS;
@@ -43,7 +47,10 @@ static void my_platform_init(int argc, const char** argv) {
 }
 
 static void my_platform_on_init_complete(void) {
-    logi("custom: on_init_complete()\n");
+    // logi("custom: on_init_complete()\n");
+
+    ESP_LOGI(TAG, "平台初始化成功");
+
 
     // Safe to call "unsafe" functions since they are called from BT thread
 
@@ -76,15 +83,19 @@ static uni_error_t my_platform_on_device_discovered(bd_addr_t addr, const char* 
 }
 
 static void my_platform_on_device_connected(uni_hid_device_t* d) {
-    logi("custom: device connected: %p\n", d);
+    // logi("custom: device connected: %p\n", d);
+    ESP_LOGI(TAG, "游戏手柄已断开: %p", d);
 }
 
 static void my_platform_on_device_disconnected(uni_hid_device_t* d) {
-    logi("custom: device disconnected: %p\n", d);
+    // logi("custom: device disconnected: %p\n", d);
+    ESP_LOGI(TAG, "游戏手柄已断开: %p", d);
 }
 
 static uni_error_t my_platform_on_device_ready(uni_hid_device_t* d) {
-    logi("custom: device ready: %p\n", d);
+    ESP_LOGI(TAG, "蓝牙初始化完成，等待游戏手柄连接...");
+
+    //logi("custom: device ready: %p\n", d);
     my_platform_instance_t* ins = get_my_platform_instance(d);
     ins->gamepad_seat = GAMEPAD_SEAT_A;
 
@@ -209,21 +220,57 @@ static void trigger_event_on_gamepad(uni_hid_device_t* d) {
     }
 }
 
+static void my_platform_on_gamepad_data(uni_hid_device_t* d, uni_gamepad_t* gp) {
+    // 打印按键状态
+    ESP_LOGI(TAG, "=== 手柄状态更新 ===");
+    
+    // 检测数字按键
+    ESP_LOGI(TAG, "A键: %s", gp->buttons & BUTTON_A ? "按下" : "释放");
+    ESP_LOGI(TAG, "B键: %s", gp->buttons & BUTTON_B ? "按下" : "释放");
+    ESP_LOGI(TAG, "X键: %s", gp->buttons & BUTTON_X ? "按下" : "释放");
+    ESP_LOGI(TAG, "Y键: %s", gp->buttons & BUTTON_Y ? "按下" : "释放");
+    
+    // 检测肩部按键
+    ESP_LOGI(TAG, "L1: %s", gp->buttons & BUTTON_SHOULDER_L ? "按下" : "释放");
+    ESP_LOGI(TAG, "R1: %s", gp->buttons & BUTTON_SHOULDER_R ? "按下" : "释放");
+    
+    // 检测触发键
+    ESP_LOGI(TAG, "L2: %d", gp->axis_l2);
+    ESP_LOGI(TAG, "R2: %d", gp->axis_r2);
+    
+    // 检测方向键
+    ESP_LOGI(TAG, "上键: %s", gp->dpad & DPAD_UP ? "按下" : "释放");
+    ESP_LOGI(TAG, "下键: %s", gp->dpad & DPAD_DOWN ? "按下" : "释放");
+    ESP_LOGI(TAG, "左键: %s", gp->dpad & DPAD_LEFT ? "按下" : "释放");
+    ESP_LOGI(TAG, "右键: %s", gp->dpad & DPAD_RIGHT ? "按下" : "释放");
+    
+    // 检测摇杆
+    ESP_LOGI(TAG, "左摇杆: X=%d, Y=%d", gp->axis_x, gp->axis_y);
+    ESP_LOGI(TAG, "右摇杆: X=%d, Y=%d", gp->axis_rx, gp->axis_ry);
+    
+    // 检测特殊按键
+    ESP_LOGI(TAG, "Start: %s", gp->buttons & BUTTON_START ? "按下" : "释放");
+    ESP_LOGI(TAG, "Select: %s", gp->buttons & BUTTON_SELECT ? "按下" : "释放");
+    
+    ESP_LOGI(TAG, "==================\n");
+}
+
 //
 // Entry Point
 //
 struct uni_platform* get_my_platform(void) {
     static struct uni_platform plat = {
-        .name = "custom",
+        .name = "my_platform",
         .init = my_platform_init,
         .on_init_complete = my_platform_on_init_complete,
         .on_device_discovered = my_platform_on_device_discovered,
         .on_device_connected = my_platform_on_device_connected,
         .on_device_disconnected = my_platform_on_device_disconnected,
-        .on_device_ready = my_platform_on_device_ready,
-        .on_oob_event = my_platform_on_oob_event,
-        .on_controller_data = my_platform_on_controller_data,
-        .get_property = my_platform_get_property,
+        // .on_device_ready = my_platform_on_device_ready,
+        // .on_oob_event = my_platform_on_oob_event,
+        // .on_controller_data = my_platform_on_controller_data,
+        // .get_property = my_platform_get_property,
+        .on_gamepad_data = my_platform_on_gamepad_data,
     };
 
     return &plat;
