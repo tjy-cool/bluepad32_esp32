@@ -5,8 +5,6 @@
 
 #include <uni.h>
 
-static const char* TAG = "my_platform";
-
 // Custom "instance"
 typedef struct my_platform_instance_s {
     uni_gamepad_seat_t gamepad_seat;  // which "seat" is being used
@@ -23,9 +21,7 @@ static void my_platform_init(int argc, const char** argv) {
     ARG_UNUSED(argc);
     ARG_UNUSED(argv);
 
-    ESP_LOGI(TAG, "平台初始化");
-
-    // logi("custom: init()\n");
+    logi("custom: my_platform_init()\n");
 
 #if 0
     uni_gamepad_mappings_t mappings = GAMEPAD_DEFAULT_MAPPINGS;
@@ -47,10 +43,7 @@ static void my_platform_init(int argc, const char** argv) {
 }
 
 static void my_platform_on_init_complete(void) {
-    // logi("custom: on_init_complete()\n");
-
-    ESP_LOGI(TAG, "平台初始化成功");
-
+    logi("custom: on_init_complete()\n");
 
     // Safe to call "unsafe" functions since they are called from BT thread
 
@@ -83,24 +76,42 @@ static uni_error_t my_platform_on_device_discovered(bd_addr_t addr, const char* 
 }
 
 static void my_platform_on_device_connected(uni_hid_device_t* d) {
-    // logi("custom: device connected: %p\n", d);
-    ESP_LOGI(TAG, "游戏手柄已断开: %p", d);
+    logi("custom: device connected: %p\n", d);
 }
 
 static void my_platform_on_device_disconnected(uni_hid_device_t* d) {
-    // logi("custom: device disconnected: %p\n", d);
-    ESP_LOGI(TAG, "游戏手柄已断开: %p", d);
+    logi("custom: device disconnected: %p\n", d);
 }
 
 static uni_error_t my_platform_on_device_ready(uni_hid_device_t* d) {
-    ESP_LOGI(TAG, "蓝牙初始化完成，等待游戏手柄连接...");
-
-    //logi("custom: device ready: %p\n", d);
+    logi("custom: device ready: %p\n", d);
     my_platform_instance_t* ins = get_my_platform_instance(d);
     ins->gamepad_seat = GAMEPAD_SEAT_A;
 
     trigger_event_on_gamepad(d);
     return UNI_ERROR_SUCCESS;
+}
+
+void dumpGamepad(const uni_gamepad_t* gp) {
+    logi(
+        "dpad: 0x%02x, buttons: 0x%04x, axis L: %4d, %4d, axis R: %4d, %4d, brake: %4d, throttle: %4d, "
+        "misc: 0x%02x, gyro x:%6d y:%6d z:%6d, accel x:%6d y:%6d z:%6d\n",
+        gp->dpad,         // D-pad
+        gp->buttons,      // bitmask of pressed buttons  
+        gp->axis_x,        // (-511 - 512) left X Axis
+        gp->axis_y,        // (-511 - 512) left Y axis
+        gp->axis_rx,       // (-511 - 512) right X axis
+        gp->axis_ry,       // (-511 - 512) right Y axis
+        gp->brake,        // (0 - 1023): brake button
+        gp->throttle,     // (0 - 1023): throttle (AKA gas) button
+        gp->misc_buttons,  // bitmask of pressed "misc" buttons
+        gp->gyro[0],        // Gyro X
+        gp->gyro[1],        // Gyro Y
+        gp->gyro[2],        // Gyro Z
+        gp->accel[0],       // Accelerometer X
+        gp->accel[1],       // Accelerometer Y
+        gp->accel[2]        // Accelerometer Z
+    );
 }
 
 static void my_platform_on_controller_data(uni_hid_device_t* d, uni_controller_t* ctl) {
@@ -125,35 +136,37 @@ static void my_platform_on_controller_data(uni_hid_device_t* d, uni_controller_t
         case UNI_CONTROLLER_CLASS_GAMEPAD:
             gp = &ctl->gamepad;
 
-            // Debugging
-            // Axis ry: control rumble
-            if ((gp->buttons & BUTTON_A) && d->report_parser.play_dual_rumble != NULL) {
-                d->report_parser.play_dual_rumble(d, 0 /* delayed start ms */, 250 /* duration ms */,
-                                                  255 /* weak magnitude */, 0 /* strong magnitude */);
-            }
-            // Buttons: Control LEDs On/Off
-            if ((gp->buttons & BUTTON_B) && d->report_parser.set_player_leds != NULL) {
-                d->report_parser.set_player_leds(d, leds++ & 0x0f);
-            }
-            // Axis: control RGB color
-            if ((gp->buttons & BUTTON_X) && d->report_parser.set_lightbar_color != NULL) {
-                uint8_t r = (gp->axis_x * 256) / 512;
-                uint8_t g = (gp->axis_y * 256) / 512;
-                uint8_t b = (gp->axis_rx * 256) / 512;
-                d->report_parser.set_lightbar_color(d, r, g, b);
-            }
+            dumpGamepad(gp);
+            
+            // // Debugging
+            // // Axis ry: control rumble
+            // if ((gp->buttons & BUTTON_A) && d->report_parser.play_dual_rumble != NULL) {
+            //     d->report_parser.play_dual_rumble(d, 0 /* delayed start ms */, 250 /* duration ms */,
+            //                                       255 /* weak magnitude */, 0 /* strong magnitude */);
+            // }
+            // // Buttons: Control LEDs On/Off
+            // if ((gp->buttons & BUTTON_B) && d->report_parser.set_player_leds != NULL) {
+            //     d->report_parser.set_player_leds(d, leds++ & 0x0f);
+            // }
+            // // Axis: control RGB color
+            // if ((gp->buttons & BUTTON_X) && d->report_parser.set_lightbar_color != NULL) {
+            //     uint8_t r = (gp->axis_x * 256) / 512;
+            //     uint8_t g = (gp->axis_y * 256) / 512;
+            //     uint8_t b = (gp->axis_rx * 256) / 512;
+            //     d->report_parser.set_lightbar_color(d, r, g, b);
+            // }
 
-            // Toggle Bluetooth connections
-            if ((gp->buttons & BUTTON_SHOULDER_L) && enabled) {
-                logi("*** Stop scanning\n");
-                uni_bt_stop_scanning_safe();
-                enabled = false;
-            }
-            if ((gp->buttons & BUTTON_SHOULDER_R) && !enabled) {
-                logi("*** Start scanning\n");
-                uni_bt_start_scanning_and_autoconnect_safe();
-                enabled = true;
-            }
+            // // Toggle Bluetooth connections
+            // if ((gp->buttons & BUTTON_SHOULDER_L) && enabled) {
+            //     logi("*** Stop scanning\n");
+            //     uni_bt_stop_scanning_safe();
+            //     enabled = false;
+            // }
+            // if ((gp->buttons & BUTTON_SHOULDER_R) && !enabled) {
+            //     logi("*** Start scanning\n");
+            //     uni_bt_start_scanning_and_autoconnect_safe();
+            //     enabled = true;
+            // }
             break;
         default:
             break;
@@ -166,31 +179,31 @@ static const uni_property_t* my_platform_get_property(uni_property_idx_t idx) {
 }
 
 static void my_platform_on_oob_event(uni_platform_oob_event_t event, void* data) {
-    switch (event) {
-        case UNI_PLATFORM_OOB_GAMEPAD_SYSTEM_BUTTON: {
-            uni_hid_device_t* d = data;
+    // switch (event) {
+    //     case UNI_PLATFORM_OOB_GAMEPAD_SYSTEM_BUTTON: {
+    //         uni_hid_device_t* d = data;
 
-            if (d == NULL) {
-                loge("ERROR: my_platform_on_oob_event: Invalid NULL device\n");
-                return;
-            }
-            logi("custom: on_device_oob_event(): %d\n", event);
+    //         if (d == NULL) {
+    //             loge("ERROR: my_platform_on_oob_event: Invalid NULL device\n");
+    //             return;
+    //         }
+    //         logi("custom: on_device_oob_event(): %d\n", event);
 
-            my_platform_instance_t* ins = get_my_platform_instance(d);
-            ins->gamepad_seat = ins->gamepad_seat == GAMEPAD_SEAT_A ? GAMEPAD_SEAT_B : GAMEPAD_SEAT_A;
+    //         my_platform_instance_t* ins = get_my_platform_instance(d);
+    //         ins->gamepad_seat = ins->gamepad_seat == GAMEPAD_SEAT_A ? GAMEPAD_SEAT_B : GAMEPAD_SEAT_A;
 
-            trigger_event_on_gamepad(d);
-            break;
-        }
+    //         trigger_event_on_gamepad(d);
+    //         break;
+    //     }
 
-        case UNI_PLATFORM_OOB_BLUETOOTH_ENABLED:
-            logi("custom: Bluetooth enabled: %d\n", (bool)(data));
-            break;
+    //     case UNI_PLATFORM_OOB_BLUETOOTH_ENABLED:
+    //         logi("custom: Bluetooth enabled: %d\n", (bool)(data));
+    //         break;
 
-        default:
-            logi("my_platform_on_oob_event: unsupported event: 0x%04x\n", event);
-            break;
-    }
+    //     default:
+    //         logi("my_platform_on_oob_event: unsupported event: 0x%04x\n", event);
+    //         break;
+    // }
 }
 
 //
@@ -220,57 +233,21 @@ static void trigger_event_on_gamepad(uni_hid_device_t* d) {
     }
 }
 
-static void my_platform_on_gamepad_data(uni_hid_device_t* d, uni_gamepad_t* gp) {
-    // 打印按键状态
-    ESP_LOGI(TAG, "=== 手柄状态更新 ===");
-    
-    // 检测数字按键
-    ESP_LOGI(TAG, "A键: %s", gp->buttons & BUTTON_A ? "按下" : "释放");
-    ESP_LOGI(TAG, "B键: %s", gp->buttons & BUTTON_B ? "按下" : "释放");
-    ESP_LOGI(TAG, "X键: %s", gp->buttons & BUTTON_X ? "按下" : "释放");
-    ESP_LOGI(TAG, "Y键: %s", gp->buttons & BUTTON_Y ? "按下" : "释放");
-    
-    // 检测肩部按键
-    ESP_LOGI(TAG, "L1: %s", gp->buttons & BUTTON_SHOULDER_L ? "按下" : "释放");
-    ESP_LOGI(TAG, "R1: %s", gp->buttons & BUTTON_SHOULDER_R ? "按下" : "释放");
-    
-    // 检测触发键
-    ESP_LOGI(TAG, "L2: %d", gp->axis_l2);
-    ESP_LOGI(TAG, "R2: %d", gp->axis_r2);
-    
-    // 检测方向键
-    ESP_LOGI(TAG, "上键: %s", gp->dpad & DPAD_UP ? "按下" : "释放");
-    ESP_LOGI(TAG, "下键: %s", gp->dpad & DPAD_DOWN ? "按下" : "释放");
-    ESP_LOGI(TAG, "左键: %s", gp->dpad & DPAD_LEFT ? "按下" : "释放");
-    ESP_LOGI(TAG, "右键: %s", gp->dpad & DPAD_RIGHT ? "按下" : "释放");
-    
-    // 检测摇杆
-    ESP_LOGI(TAG, "左摇杆: X=%d, Y=%d", gp->axis_x, gp->axis_y);
-    ESP_LOGI(TAG, "右摇杆: X=%d, Y=%d", gp->axis_rx, gp->axis_ry);
-    
-    // 检测特殊按键
-    ESP_LOGI(TAG, "Start: %s", gp->buttons & BUTTON_START ? "按下" : "释放");
-    ESP_LOGI(TAG, "Select: %s", gp->buttons & BUTTON_SELECT ? "按下" : "释放");
-    
-    ESP_LOGI(TAG, "==================\n");
-}
-
 //
 // Entry Point
 //
 struct uni_platform* get_my_platform(void) {
     static struct uni_platform plat = {
-        .name = "my_platform",
+        .name = "custom",
         .init = my_platform_init,
         .on_init_complete = my_platform_on_init_complete,
         .on_device_discovered = my_platform_on_device_discovered,
         .on_device_connected = my_platform_on_device_connected,
         .on_device_disconnected = my_platform_on_device_disconnected,
-        // .on_device_ready = my_platform_on_device_ready,
-        // .on_oob_event = my_platform_on_oob_event,
-        // .on_controller_data = my_platform_on_controller_data,
-        // .get_property = my_platform_get_property,
-        .on_gamepad_data = my_platform_on_gamepad_data,
+        .on_device_ready = my_platform_on_device_ready,
+        .on_oob_event = my_platform_on_oob_event,
+        .on_controller_data = my_platform_on_controller_data,
+        .get_property = my_platform_get_property,
     };
 
     return &plat;
