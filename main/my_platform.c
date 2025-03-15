@@ -4,6 +4,9 @@
 #include <string.h>
 
 #include <uni.h>
+#include "driver/gpio.h"
+
+#define LED_GPIO GPIO_NUM_2
 
 // Custom "instance"
 typedef struct my_platform_instance_s {
@@ -114,6 +117,34 @@ void dumpGamepad(const uni_gamepad_t* gp) {
     );
 }
 
+void dumpGamepad_2(const uni_gamepad_t* gp) {
+    if (gp->dpad & DPAD_UP)         logi("DPAD_UP\n");
+    if (gp->dpad & DPAD_DOWN)       logi("DPAD_DOWN\n");
+    if (gp->dpad & DPAD_LEFT)       logi("DPAD_LEFT\n");
+    if (gp->dpad & DPAD_RIGHT)      logi("DPAD_RIGHT\n");
+    if (gp->buttons & BUTTON_A)     logi("BUTTON_A\n");
+    if (gp->buttons & BUTTON_B)     logi("BUTTON_B\n");
+    if (gp->buttons & BUTTON_X)     logi("BUTTON_X\n");
+    if (gp->buttons & BUTTON_Y)     logi("BUTTON_Y\n");
+    if (gp->buttons & BUTTON_SHOULDER_L)     logi("BUTTON_SHOULDER_L\n");
+    if (gp->buttons & BUTTON_SHOULDER_R)     logi("BUTTON_SHOULDER_R\n");
+    if (gp->buttons & BUTTON_THUMB_L)     logi("BUTTON_THUMB_L\n");
+    if (gp->buttons & BUTTON_THUMB_R)     logi("BUTTON_THUMB_R\n");
+    if (gp->buttons & BUTTON_TRIGGER_L)     logi("BUTTON_TRIGGER_L\n");
+    if (gp->buttons & BUTTON_TRIGGER_R)     logi("BUTTON_TRIGGER_R\n");
+    if (gp->axis_x  != 0 || gp->axis_y != 0)  logi("axis L: %4d, %4d\n", gp->axis_x, gp->axis_y);
+    if (gp->axis_rx  != 0 || gp->axis_ry != 0)  logi("axis R: %4d, %4d\n", gp->axis_rx, gp->axis_ry);
+    // logi("gyro x:%6d y:%6d z:%6d, accel x:%6d y:%6d z:%6d\n", gp->gyro[0],        // Gyro X
+    //             gp->gyro[1],        // Gyro Y
+    //             gp->gyro[2],        // Gyro Z
+    //             gp->accel[0],       // Accelerometer X
+    //             gp->accel[1],       // Accelerometer Y
+    //             gp->accel[2]        // Accelerometer Z)
+    // );
+
+}
+
+
 static void my_platform_on_controller_data(uni_hid_device_t* d, uni_controller_t* ctl) {
     static uint8_t leds = 0;
     static uint8_t enabled = true;
@@ -136,18 +167,26 @@ static void my_platform_on_controller_data(uni_hid_device_t* d, uni_controller_t
         case UNI_CONTROLLER_CLASS_GAMEPAD:
             gp = &ctl->gamepad;
 
-            dumpGamepad(gp);
+            // on dump method
+            // dumpGamepad(gp);
             
-            // // Debugging
-            // // Axis ry: control rumble
-            // if ((gp->buttons & BUTTON_A) && d->report_parser.play_dual_rumble != NULL) {
-            //     d->report_parser.play_dual_rumble(d, 0 /* delayed start ms */, 250 /* duration ms */,
-            //                                       255 /* weak magnitude */, 0 /* strong magnitude */);
-            // }
-            // // Buttons: Control LEDs On/Off
-            // if ((gp->buttons & BUTTON_B) && d->report_parser.set_player_leds != NULL) {
-            //     d->report_parser.set_player_leds(d, leds++ & 0x0f);
-            // }
+            // another dump method
+            dumpGamepad_2(gp);
+            if (gp->dpad & DPAD_UP)       gpio_set_level(LED_GPIO, 1);  
+            if (gp->dpad & DPAD_DOWN)     gpio_set_level(LED_GPIO, 0); 
+            
+            
+
+            // Debugging
+            // Axis ry: control rumble
+            if ((gp->buttons & BUTTON_X) && d->report_parser.play_dual_rumble != NULL) {
+                d->report_parser.play_dual_rumble(d, 0 /* delayed start ms */, 250 /* duration ms */,
+                                                  255 /* weak magnitude */, 0 /* strong magnitude */);
+            }
+            // Buttons: Control LEDs On/Off
+            if ((gp->buttons & BUTTON_B) && d->report_parser.set_player_leds != NULL) {
+                    d->report_parser.set_player_leds(d, leds++ & 0x0f);
+            }
             // // Axis: control RGB color
             // if ((gp->buttons & BUTTON_X) && d->report_parser.set_lightbar_color != NULL) {
             //     uint8_t r = (gp->axis_x * 256) / 512;
@@ -237,6 +276,10 @@ static void trigger_event_on_gamepad(uni_hid_device_t* d) {
 // Entry Point
 //
 struct uni_platform* get_my_platform(void) {
+    gpio_reset_pin(LED_GPIO);
+    gpio_set_direction(LED_GPIO, GPIO_MODE_OUTPUT);
+
+
     static struct uni_platform plat = {
         .name = "custom",
         .init = my_platform_init,
